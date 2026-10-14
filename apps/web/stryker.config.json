@@ -1,7 +1,7 @@
 {
 	"$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/core/schema/stryker-schema.json",
 	"testRunner": "vitest",
-	"tsconfigFile": "tsconfig.stryker-skip.json",
+	"inPlace": true,
 	"plugins": ["@stryker-mutator/vitest-runner"],
 	"vitest": {
 		"configFile": "vitest.stryker.config.ts"

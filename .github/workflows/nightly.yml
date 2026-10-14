@@ -64,11 +64,11 @@ jobs:
         continue-on-error: true
       - name: 失敗したテストを集める
         run: |
-          if [ -f results/results.json ]; then
-            jq -r '[.. | objects | select(has("specs")) | .specs[] | .file as $f | .title as $t
+          if [ -f results/apps/web/results.json ]; then
+            jq -r '[.. | objects | select(has("specs")) | .file as $f | .specs[] | .title as $t
               | .tests[] | select(.status == "unexpected")
               | "- `\($f)` › \($t) [\(.projectName)]"] | unique | .[]' \
-              results/results.json > failed.md
+              results/apps/web/results.json > failed.md
           fi
           if [ ! -s failed.md ]; then
             echo "- （テスト単位の失敗を取得できませんでした。ビルドや起動の失敗の可能性があります。run のログを確認してください）" > failed.md
