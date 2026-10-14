@@ -1,0 +1,36 @@
+{
+	"name": "@autopilot-lab/web",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "テスト基盤の検証用の小さな ToDo アプリ",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"test": "vitest run --project unit",
+		"test:browser": "vitest run --project browser",
+		"e2e": "playwright test",
+		"lint": "biome check .",
+		"typecheck": "tsc --noEmit",
+		"check": "pnpm lint && pnpm typecheck && pnpm test"
+	},
+	"dependencies": {
+		"react": "^19.3.0",
+		"react-dom": "^19.3.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.15",
+		"@playwright/test": "1.64.0",
+		"@types/node": "^24.0.0",
+		"@types/react": "^19.3.0",
+		"@types/react-dom": "^19.3.0",
+		"@vitejs/plugin-react": "^6.1.2",
+		"@vitest/browser": "^5.0.4",
+		"@vitest/browser-playwright": "^5.0.4",
+		"playwright": "1.64.0",
+		"typescript": "^7.0.2",
+		"vite": "^8.3.4",
+		"vitest": "^5.0.4",
+		"vitest-browser-react": "^2.3.0"
+	}
+}
