@@ -32,3 +32,32 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ github.token }}
+  # apps/web のテスト（単体・ブラウザ・E2E）。Playwright 公式イメージで実行する。
+  # イメージのタグは apps/web/package.json の @playwright/test と一致させること
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: mcr.microsoft.com/playwright:v1.64.0-noble
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @autopilot-lab/web check
+      - run: pnpm --filter @autopilot-lab/web test:browser
+      # スクショの基準画像がまだ無いので比較は飛ばす。
+      # apps/web/e2e/todo.spec.ts-snapshots をコミットしたら --ignore-snapshots を外す
+      - run: pnpm --filter @autopilot-lab/web exec playwright test --ignore-snapshots
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: web-test-results
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+            apps/web/src/**/__screenshots__
+          retention-days: 7
+          if-no-files-found: ignore

@@ -6,7 +6,7 @@
 	"packageManager": "pnpm@12.11.2",
 	"description": "自律運用（ADR-0011）の計測・検証用の練習リポジトリ",
 	"scripts": {
-		"test": "vitest run",
+		"test": "vitest run --dir src",
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check .",
 		"format": "biome check --write .",

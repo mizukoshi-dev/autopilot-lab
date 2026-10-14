@@ -1,0 +1,62 @@
+body {
+	margin: 0;
+	font-family: system-ui, sans-serif;
+	background: #f5f5f5;
+	color: #222;
+}
+
+.app {
+	box-sizing: border-box;
+	max-width: 480px;
+	margin: 32px auto;
+	padding: 24px;
+	background: #fff;
+	border-radius: 8px;
+}
+
+.new-todo {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.new-todo input {
+	flex: 1;
+}
+
+.filters {
+	display: flex;
+	gap: 8px;
+	margin: 16px 0;
+	padding: 0;
+	border: 0;
+}
+
+.filters button[aria-pressed="true"] {
+	background: #222;
+	color: #fff;
+}
+
+ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+li {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 8px 0;
+	border-bottom: 1px solid #eee;
+}
+
+.done {
+	text-decoration: line-through;
+	color: #888;
+}
+
+.empty,
+.remaining {
+	color: #666;
+}
