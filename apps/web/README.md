@@ -55,3 +55,32 @@ cp -r /tmp/pw-out/todo.spec.ts-snapshots apps/web/e2e/
 ## Playwright のバージョン
 
 `@playwright/test` と `playwright` は Docker イメージのタグ（`v1.64.0`）と**完全に一致**させるため、`^` を付けずに固定している。上げるときは `package.json` とイメージのタグ（`ci.yml`・この README）を同時に上げ、基準画像を撮り直す。
+
+## 夜間・週次のテスト
+
+PR の CI（`ci.yml`）は速さを優先して chromium だけを回す。時間のかかるものは `schedule` で別に回す。
+
+| ワークフロー | いつ | 内容 | 失敗したら |
+| --- | --- | --- | --- |
+| `nightly.yml` | 毎日 JST 3:00（UTC 18:00）・手動 | Chromium + Firefox + WebKit + iPhone 15（WebKit）の E2E。公式 Docker イメージで実行し、`--ignore-snapshots` でスクショ比較は飛ばす | 同じタイトルの open な Issue が無ければ Issue を作る（ラベル `bug`・`claude:ready`）。本文に失敗したテストと run の URL |
+| `weekly.yml` | 毎週月曜 JST 4:00（日曜 UTC 19:00）・手動 | Stryker のミューテーションテスト。対象は `src/todo.ts` と `src/storage.ts`。スコアを run の要約に出し、HTML レポートを artifact に残す（14 日） | スコアが 60% 未満なら Issue を作る（ラベル `test-quality`、同じタイトルの open な Issue が無いとき） |
+
+### 全ブラウザで手元実行
+
+```sh
+pnpm --filter @autopilot-lab/web exec playwright install firefox webkit
+PW_ALL_BROWSERS=1 pnpm --filter @autopilot-lab/web e2e
+```
+
+`PW_ALL_BROWSERS=1` を付けたときだけ `playwright.config.ts` に firefox・webkit・mobile-safari（`devices['iPhone 15']`）が加わる。付けなければ chromium だけ。
+
+### ミューテーションテストを手元で実行
+
+```sh
+pnpm --filter @autopilot-lab/web mutation
+```
+
+- 単体テストだけを回す（`vitest.stryker.config.ts`。Chromium は不要）
+- レポートは `apps/web/reports/mutation/`（`mutation.html`・`mutation.json`。git 管理外）
+- スコア = 検出（Killed + Timeout）/（検出 + Survived + NoCoverage）。基準 60% は Stryker の `thresholds.break` ではなく `weekly.yml` の `MIN_SCORE` で判定する（落とさず Issue にするため）
+- スコアが低いときは、生き残ったミュータントを殺すテストを足す。**テストをミュータントに合わせて弱めない**

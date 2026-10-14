@@ -1,0 +1,17 @@
+{
+	"$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/core/schema/stryker-schema.json",
+	"testRunner": "vitest",
+	"tsconfigFile": "tsconfig.stryker-skip.json",
+	"plugins": ["@stryker-mutator/vitest-runner"],
+	"vitest": {
+		"configFile": "vitest.stryker.config.ts"
+	},
+	"mutate": ["src/todo.ts", "src/storage.ts"],
+	"coverageAnalysis": "off",
+	"reporters": ["html", "json", "clear-text"],
+	"htmlReporter": { "fileName": "reports/mutation/mutation.html" },
+	"jsonReporter": { "fileName": "reports/mutation/mutation.json" },
+	"thresholds": { "high": 80, "low": 60, "break": null },
+	"tempDirName": ".stryker-tmp",
+	"cleanTempDir": true
+}

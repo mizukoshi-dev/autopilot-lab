@@ -1,0 +1,97 @@
+# 夜間: 全ブラウザ（chromium・firefox・webkit・iPhone）の E2E。失敗したら Issue を起こす。
+# 毎日 JST 3:00 = UTC 18:00。スクショ比較は環境差が大きいので飛ばす（--ignore-snapshots）
+name: nightly
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # イメージのタグは ci.yml・apps/web/package.json の @playwright/test と一致させること
+    container: mcr.microsoft.com/playwright:v1.64.0-noble
+    env:
+      PW_ALL_BROWSERS: "1"
+      PLAYWRIGHT_JSON_OUTPUT_NAME: results.json
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Firefox はコンテナ内で HOME=/root が必要
+      - run: pnpm --filter @autopilot-lab/web exec playwright test --ignore-snapshots --reporter=list,html,json
+        env:
+          HOME: /root
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: nightly-e2e-results
+          path: |
+            apps/web/results.json
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # コンテナに gh が無いので、Issue 作成は別ジョブ（ubuntu-latest）で行う
+  report:
+    needs: e2e
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ISSUE_TITLE: "[nightly] 全ブラウザ E2E が失敗しました"
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: nightly-e2e-results
+          path: results
+        continue-on-error: true
+      - name: 失敗したテストを集める
+        run: |
+          if [ -f results/results.json ]; then
+            jq -r '[.. | objects | select(has("specs")) | .specs[] | .file as $f | .title as $t
+              | .tests[] | select(.status == "unexpected")
+              | "- `\($f)` › \($t) [\(.projectName)]"] | unique | .[]' \
+              results/results.json > failed.md
+          fi
+          if [ ! -s failed.md ]; then
+            echo "- （テスト単位の失敗を取得できませんでした。ビルドや起動の失敗の可能性があります。run のログを確認してください）" > failed.md
+          fi
+          cat failed.md
+      - name: 同じタイトルの open な Issue が無ければ作る
+        run: |
+          existing=$(gh issue list --state open --limit 200 --json title \
+            --jq "[.[] | select(.title == env.ISSUE_TITLE)] | length")
+          if [ "$existing" != "0" ]; then
+            echo "同じタイトルの open な Issue があるので作らない"
+            exit 0
+          fi
+          {
+            echo "夜間の全ブラウザ E2E（\`PW_ALL_BROWSERS=1\`）が失敗しました。"
+            echo
+            echo "- run: $RUN_URL"
+            echo
+            echo "## 失敗したテスト"
+            echo
+            cat failed.md
+            echo
+            echo "trace と report は run の artifact \`nightly-e2e-results\`（7 日間）にあります。"
+          } > body.md
+          gh issue create --title "$ISSUE_TITLE" --body-file body.md \
+            --label bug --label claude:ready
