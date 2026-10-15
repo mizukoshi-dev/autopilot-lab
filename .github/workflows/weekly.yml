@@ -1,0 +1,102 @@
+# 週次: Stryker のミューテーションテスト。スコアを記録し、60% 未満なら Issue を起こす。
+# 毎週月曜 JST 4:00 = 日曜 UTC 19:00
+name: weekly
+on:
+  schedule:
+    - cron: "0 19 * * 0"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: weekly
+  cancel-in-progress: false
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+    env:
+      MIN_SCORE: "60"
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ISSUE_TITLE: "[weekly] ミューテーションスコアが基準（60%）未満です"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @autopilot-lab/web mutation
+      - name: スコアを集計して要約に出す
+        id: score
+        run: |
+          json=apps/web/reports/mutation/mutation.json
+          # Stryker の定義: 検出 = Killed + Timeout、未検出 = Survived + NoCoverage（それ以外は分母に入れない）
+          read -r killed timeout survived nocoverage < <(jq -r '
+            [.files[].mutants[].status] as $s
+            | [($s | map(select(. == "Killed")) | length),
+               ($s | map(select(. == "Timeout")) | length),
+               ($s | map(select(. == "Survived")) | length),
+               ($s | map(select(. == "NoCoverage")) | length)] | @tsv' "$json")
+          detected=$((killed + timeout))
+          total=$((detected + survived + nocoverage))
+          if [ "$total" -eq 0 ]; then
+            score=100.00
+          else
+            score=$(awk -v d="$detected" -v t="$total" 'BEGIN { printf "%.2f", d * 100 / t }')
+          fi
+          echo "score=$score" >> "$GITHUB_OUTPUT"
+          {
+            echo "## ミューテーションスコア: ${score}%（基準 ${MIN_SCORE}%）"
+            echo
+            echo "| Killed | Timeout | Survived | NoCoverage |"
+            echo "| ---: | ---: | ---: | ---: |"
+            echo "| $killed | $timeout | $survived | $nocoverage |"
+            echo
+            echo "### 生き残ったミュータント（先頭 30 件）"
+            echo
+            echo '```'
+            jq -r '.files | to_entries[] | .key as $f | .value.mutants[]
+              | select(.status == "Survived")
+              | "\($f):\(.location.start.line) \(.mutatorName)"' "$json" | head -n 30
+            echo '```'
+            echo
+            echo "HTML レポートは artifact \`mutation-report\`（14 日間）にあります。"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: mutation-report
+          path: apps/web/reports/mutation
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: 基準未満なら Issue を作る
+        env:
+          SCORE: ${{ steps.score.outputs.score }}
+        run: |
+          if awk -v s="$SCORE" -v m="$MIN_SCORE" 'BEGIN { exit !(s < m) }'; then
+            :
+          else
+            echo "スコア ${SCORE}% は基準 ${MIN_SCORE}% 以上"
+            exit 0
+          fi
+          existing=$(gh issue list --state open --limit 200 --json title \
+            --jq "[.[] | select(.title == env.ISSUE_TITLE)] | length")
+          if [ "$existing" != "0" ]; then
+            echo "同じタイトルの open な Issue があるので作らない"
+            exit 0
+          fi
+          {
+            echo "週次のミューテーションテストのスコアが ${SCORE}% で、基準 ${MIN_SCORE}% を下回りました。"
+            echo
+            echo "- run: $RUN_URL"
+            echo "- 対象: \`apps/web/src/todo.ts\`・\`apps/web/src/storage.ts\`"
+            echo
+            echo "生き残ったミュータントは run の要約と artifact \`mutation-report\`（HTML）で確認できます。テストを足して殺してください。"
+          } > body.md
+          gh issue create --title "$ISSUE_TITLE" --body-file body.md --label test-quality

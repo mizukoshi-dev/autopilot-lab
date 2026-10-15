@@ -7,3 +7,5 @@ test-results/
 blob-report/
 __screenshots__/
 .vitest-attachments/
+.stryker-tmp/
+reports/
