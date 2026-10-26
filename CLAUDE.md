@@ -14,5 +14,5 @@
 
 ## 作業の流れ
 - Issue 1 件 = PR 1 件。ブランチは `<type>/<要約>`、コミットは Conventional Commits
-- 実装したら `/self-review` で Draft PR にする
+- 実装したら `dev-workflow` プラグインの `self-review` スキルで Draft PR にする
 - 受け入れ条件と「触ってよい範囲」の外は変更しない
